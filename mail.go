@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sg3des/eml/decoder"
+	"github.com/Schidstorm/eml/decoder"
 )
 
 var benc = base64.URLEncoding
@@ -146,23 +146,29 @@ func Process(r RawMessage) (m Message, e error) {
 		}
 
 		for _, part := range parts {
+			part.Data = encodeData(part.Data, part.Charset)
+		}
+
+		for _, part := range parts {
+			if encoding, ok := part.Headers["Content-Transfer-Encoding"]; ok {
+				switch strings.ToLower(encoding[0]) {
+				case "base64":
+					part.Data, er = base64.StdEncoding.DecodeString(string(part.Data))
+					if er != nil {
+						fmt.Println(er, "failed decode base64")
+					}
+				case "quoted-printable":
+					part.Data, _ = ioutil.ReadAll(quotedprintable.NewReader(bytes.NewReader(part.Data)))
+				}
+			}
+		}
+
+		for _, part := range parts {
 			switch {
 			case strings.Contains(part.Type, "text/plain"):
-
-				data, err := decoder.UTF8(part.Charset, part.Data)
-				if err != nil {
-					m.Text = string(part.Data)
-				} else {
-					m.Text = string(data)
-				}
+				m.Text = string(part.Data)
 			case strings.Contains(part.Type, "text/html"):
-
-				data, err := decoder.UTF8(part.Charset, part.Data)
-				if err != nil {
-					m.Html = string(part.Data)
-				} else {
-					m.Html = string(data)
-				}
+				m.Html = string(part.Data)
 
 			default:
 				if cd, ok := part.Headers["Content-Disposition"]; ok {
@@ -180,17 +186,6 @@ func Process(r RawMessage) (m Message, e error) {
 							filename[1] = string(dfilename)
 						}
 
-						if encoding, ok := part.Headers["Content-Transfer-Encoding"]; ok {
-							switch strings.ToLower(encoding[0]) {
-							case "base64":
-								part.Data, er = base64.StdEncoding.DecodeString(string(part.Data))
-								if er != nil {
-									fmt.Println(er, "failed decode base64")
-								}
-							case "quoted-printable":
-								part.Data, _ = ioutil.ReadAll(quotedprintable.NewReader(bytes.NewReader(part.Data)))
-							}
-						}
 						m.Attachments = append(m.Attachments, Attachment{filename[1], part.Data})
 
 					}
@@ -205,6 +200,15 @@ func Process(r RawMessage) (m Message, e error) {
 		m.Text = string(r.Body)
 	}
 	return
+}
+
+func encodeData(data []byte, charset string) []byte {
+	decodedData, err := decoder.UTF8(charset, data)
+	if err != nil {
+		return data
+	} else {
+		return decodedData
+	}
 }
 
 type RawHeader struct {

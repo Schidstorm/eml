@@ -13,10 +13,10 @@ type parseBodyTest struct {
 
 var parseBodyTests = []parseBodyTest{
 	{
-		ct:   "text/plain",
+		ct:   "text/plain; charset=UTF-8",
 		body: []byte(`This is some text.`),
 		rps: []Part{
-			{"text/plain", "UTF-8", []byte("This is some text."), nil},
+			{"text/plain; charset=UTF-8", "UTF-8", []byte("This is some text."), nil},
 		},
 	},
 	{

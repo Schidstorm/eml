@@ -4,11 +4,12 @@ package eml
 
 import (
 	"bytes"
-	"errors"
+	"encoding/base64"
 	"io"
 	"io/ioutil"
 	"mime"
 	"mime/multipart"
+	"mime/quotedprintable"
 	"regexp"
 )
 
@@ -24,26 +25,27 @@ type Part struct {
 // present; otherwise, it will contain a single entry, with the entire (raw)
 // message contents.
 func parseBody(ct string, body []byte) (parts []Part, err error) {
-	mt, ps, err := mime.ParseMediaType(ct)
+	_, ps, err := mime.ParseMediaType(ct)
 	if err != nil {
-		return
-	}
-
-	if mt != "multipart/alternative" {
-		parts = append(parts, Part{ct, ps["charset"], body, nil})
 		return
 	}
 
 	boundary, ok := ps["boundary"]
 	if !ok {
-		return nil, errors.New("multipart specified without boundary")
+		parts = append(parts, Part{ct, ps["charset"], body, nil})
+		return
 	}
 	r := multipart.NewReader(bytes.NewReader(body), boundary)
-	p, err := r.NextPart()
-	for err == nil {
-		data, _ := ioutil.ReadAll(p) // ignore error
+	p, err := r.NextRawPart()
+	for err != io.EOF {
+		data, _ := ioutil.ReadAll(decodeByTransferEncoding(p, p.Header.Get("Content-Transfer-Encoding"))) // ignore error
+
 		var subparts []Part
 		subparts, err = parseBody(p.Header["Content-Type"][0], data)
+		for i := range subparts {
+			subparts[i].Headers = p.Header
+		}
+
 		//if err == nil then body have sub multipart, and append him
 		if err == nil {
 			parts = append(parts, subparts...)
@@ -56,10 +58,22 @@ func parseBody(ct string, body []byte) (parts []Part, err error) {
 			part := Part{p.Header["Content-Type"][0], charset, data, p.Header}
 			parts = append(parts, part)
 		}
-		p, err = r.NextPart()
+		p, err = r.NextRawPart()
 	}
 	if err == io.EOF {
 		err = nil
 	}
 	return
+}
+
+func decodeByTransferEncoding(reader io.Reader, transferEncoding string) io.Reader {
+	const cte = "Content-Transfer-Encoding"
+	switch transferEncoding {
+	case "quoted-printable":
+		return quotedprintable.NewReader(reader)
+	case "base64":
+		return base64.NewDecoder(base64.StdEncoding, reader)
+	default:
+		return reader
+	}
 }
