@@ -62,7 +62,7 @@ Some other text.
 
 func TestParseBody(t *testing.T) {
 	for _, pt := range parseBodyTests {
-		parts, e := parseBody(pt.ct, pt.body)
+		parts, e := parseMultipartBody(pt.ct, pt.body)
 		if e != nil {
 			t.Errorf("parseBody returned error for %#v: %#v", pt, e)
 		} else if !reflect.DeepEqual(parts, pt.rps) {

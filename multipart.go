@@ -4,12 +4,10 @@ package eml
 
 import (
 	"bytes"
-	"encoding/base64"
 	"io"
 	"io/ioutil"
 	"mime"
 	"mime/multipart"
-	"mime/quotedprintable"
 	"regexp"
 )
 
@@ -24,7 +22,7 @@ type Part struct {
 // type is multipart, the parts slice will contain an entry for each part
 // present; otherwise, it will contain a single entry, with the entire (raw)
 // message contents.
-func parseBody(ct string, body []byte) (parts []Part, err error) {
+func parseMultipartBody(ct string, body []byte) (parts []Part, err error) {
 	_, ps, err := mime.ParseMediaType(ct)
 	if err != nil {
 		return
@@ -38,10 +36,10 @@ func parseBody(ct string, body []byte) (parts []Part, err error) {
 	r := multipart.NewReader(bytes.NewReader(body), boundary)
 	p, err := r.NextRawPart()
 	for err != io.EOF {
-		data, _ := ioutil.ReadAll(decodeByTransferEncoding(p, p.Header.Get("Content-Transfer-Encoding"))) // ignore error
+		data, _ := ioutil.ReadAll(p) // ignore error
 
 		var subparts []Part
-		subparts, err = parseBody(p.Header["Content-Type"][0], data)
+		subparts, err = parseMultipartBody(p.Header["Content-Type"][0], data)
 		for i := range subparts {
 			subparts[i].Headers = p.Header
 		}
@@ -64,16 +62,4 @@ func parseBody(ct string, body []byte) (parts []Part, err error) {
 		err = nil
 	}
 	return
-}
-
-func decodeByTransferEncoding(reader io.Reader, transferEncoding string) io.Reader {
-	const cte = "Content-Transfer-Encoding"
-	switch transferEncoding {
-	case "quoted-printable":
-		return quotedprintable.NewReader(reader)
-	case "base64":
-		return base64.NewDecoder(base64.StdEncoding, reader)
-	default:
-		return reader
-	}
 }

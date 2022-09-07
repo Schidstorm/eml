@@ -142,7 +142,6 @@ var parseTests = []parseTest{
 		Message{
 			HeaderInfo: HeaderInfo{
 				FullHeaders: []Header{},
-				OptHeaders:  []Header{},
 			},
 			Text: "\r\n",
 		},
@@ -155,10 +154,42 @@ G'day, mate.
 		Message{
 			HeaderInfo: HeaderInfo{
 				FullHeaders: []Header{{"Subject", "Hello, world"}},
-				OptHeaders:  []Header{},
 				Subject:     "Hello, world",
 			},
 			Text: "G'day, mate.\r\n",
+		},
+	},
+	{
+		crlf(`Subject: Hello, world
+Content-Type: text/plain
+Content-Transfer-Encoding: base64
+
+VGhpcyBpcyBhIHRlc3QgaW4gYmFzZTY0
+VGhpcyBpcyBhIHRlc3QgaW4gYmFzZTY0
+`),
+		Message{
+			HeaderInfo: HeaderInfo{
+				FullHeaders: []Header{
+					{"Subject", "Hello, world"},
+					{"Content-Type", "text/plain"},
+					{"Content-Transfer-Encoding", "base64"},
+				},
+				Subject:     "Hello, world",
+				ContentType: "text/plain",
+			},
+			Text: "This is a test in base64This is a test in base64",
+			Parts: []Part{
+				Part{
+					Type:    "text/plain",
+					Charset: "",
+					Data:    []byte("This is a test in base64This is a test in base64"),
+					Headers: map[string][]string{
+						"Content-Transfer-Encoding": []string{"base64"},
+						"Content-Type":              []string{"text/plain"},
+						"Subject":                   []string{"Hello, world"},
+					},
+				},
+			},
 		},
 	},
 }
@@ -172,7 +203,7 @@ func TestParse(t *testing.T) {
 			t.Errorf("Parse returned error for %#v\n", string(msg))
 			t.Errorf("Error: %s", err.Error())
 		} else if !reflect.DeepEqual(act, ret) {
-			t.Errorf("Parse: incorrect result from %#v as %#v; expected %#v", string(msg), act, ret)
+			t.Errorf("Parse: incorrect result from %#v \nas\n %#v; \nexpected\n %#v", string(msg), act, ret)
 		}
 	}
 }

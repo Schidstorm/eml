@@ -10,7 +10,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
+	"mime"
 	"mime/quotedprintable"
 	"regexp"
 	"strings"
@@ -31,7 +32,6 @@ func mkId(s []byte) string {
 
 type HeaderInfo struct {
 	FullHeaders []Header // all headers
-	OptHeaders  []Header // unprocessed headers
 
 	MessageId   string
 	Id          string
@@ -79,7 +79,6 @@ func Parse(s []byte) (m Message, e error) {
 
 func Process(r RawMessage) (m Message, e error) {
 	m.FullHeaders = []Header{}
-	m.OptHeaders = []Header{}
 	for _, rh := range r.RawHeaders {
 		h := Header{string(rh.Key), string(rh.Value)}
 		m.FullHeaders = append(m.FullHeaders, h)
@@ -127,8 +126,6 @@ func Process(r RawMessage) (m Message, e error) {
 			for _, k := range ks {
 				m.Keywords = append(m.Keywords, strings.TrimSpace(k))
 			}
-		default:
-			m.OptHeaders = append(m.OptHeaders, h)
 		}
 		if e != nil {
 			return
@@ -138,29 +135,48 @@ func Process(r RawMessage) (m Message, e error) {
 		m.Sender = m.From[0]
 	}
 
-	if m.ContentType != `` {
-		parts, er := parseBody(m.ContentType, r.Body)
+	var parts []Part
+	var er error
+
+	if m.ContentType == "multipart/alternative" {
+		parts, er = parseMultipartBody(m.ContentType, r.Body)
 		if er != nil {
 			e = er
 			return
 		}
+	} else if m.ContentType != "" {
+		_, ps, err := mime.ParseMediaType(m.ContentType)
+		if err != nil {
+			e = err
+			return
+		}
+		parts = append(parts, Part{m.ContentType, ps["charset"], r.Body, nil})
+	}
 
-		for _, part := range parts {
-			part.Data = encodeData(part.Data, part.Charset)
+	if m.ContentType != `` {
+		if m.ContentType != "multipart/alternative" && len(parts) > 0 {
+			if parts[0].Headers == nil {
+				parts[0].Headers = map[string][]string{}
+			}
+			for _, h := range m.HeaderInfo.FullHeaders {
+				if _, ok := parts[0].Headers[h.Key]; !ok {
+					parts[0].Headers[h.Key] = []string{}
+				}
+				parts[0].Headers[h.Key] = append(parts[0].Headers[h.Key], h.Value)
+			}
+
 		}
 
-		for _, part := range parts {
-			if encoding, ok := part.Headers["Content-Transfer-Encoding"]; ok {
-				switch strings.ToLower(encoding[0]) {
-				case "base64":
-					part.Data, er = base64.StdEncoding.DecodeString(string(part.Data))
-					if er != nil {
-						fmt.Println(er, "failed decode base64")
-					}
-				case "quoted-printable":
-					part.Data, _ = ioutil.ReadAll(quotedprintable.NewReader(bytes.NewReader(part.Data)))
+		for i := range parts {
+			if hdr, ok := parts[i].Headers["Content-Transfer-Encoding"]; ok {
+				parts[i].Data, er = decodeByTransferEncoding(parts[i].Data, hdr[0])
+				if er != nil {
+					e = er
+					return
 				}
 			}
+
+			parts[i].Data = encodeData(parts[i].Data, parts[i].Charset)
 		}
 
 		for _, part := range parts {
@@ -200,6 +216,18 @@ func Process(r RawMessage) (m Message, e error) {
 		m.Text = string(r.Body)
 	}
 	return
+}
+
+func decodeByTransferEncoding(body []byte, transferEncoding string) ([]byte, error) {
+	var reader io.Reader = bytes.NewBuffer(body)
+	switch transferEncoding {
+	case "quoted-printable":
+		reader = quotedprintable.NewReader(reader)
+	case "base64":
+		reader = base64.NewDecoder(base64.StdEncoding, reader)
+	}
+
+	return io.ReadAll(reader)
 }
 
 func encodeData(data []byte, charset string) []byte {
