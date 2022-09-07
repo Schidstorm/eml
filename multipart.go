@@ -31,7 +31,7 @@ func parseBody(ct string, body []byte) (parts []Part, err error) {
 
 	if mt != "multipart/alternative" {
 		parts = append(parts, Part{ct, ps["charset"], body, nil})
-	 	return
+		return
 	}
 
 	boundary, ok := ps["boundary"]

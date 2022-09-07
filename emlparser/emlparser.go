@@ -7,7 +7,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/sg3des/eml"
+	"github.com/Schidstorm/eml"
 )
 
 var (
