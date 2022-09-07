@@ -29,10 +29,10 @@ func parseBody(ct string, body []byte) (parts []Part, err error) {
 		return
 	}
 
-	// if mt != "multipart/alternative" {
-	// 	parts = append(parts, Part{ct, body, nil})
-	// 	return
-	// }
+	if mt != "multipart/alternative" {
+		parts = append(parts, Part{ct, body, nil})
+	 	return
+	}
 
 	boundary, ok := ps["boundary"]
 	if !ok {
