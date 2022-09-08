@@ -238,6 +238,37 @@ VGhpcyBpcyBhIHRlc3QgaW4gYmFzZTY0
 			},
 		},
 	},
+
+	{
+		crlf(`Content-Type: multipart/alternative; boundary=90e6ba1efd30b0013a04b8d4970f
+
+--90e6ba1efd30b0013a04b8d4970f
+Content-Type: text/plain
+
+Some text.
+--90e6ba1efd30b0013a04b8d4970f
+`),
+		Message{
+			HeaderInfo: HeaderInfo{
+				FullHeaders: HeaderList{
+					"Content-Type": {"multipart/alternative; boundary=90e6ba1efd30b0013a04b8d4970f"},
+				},
+			},
+			Text: "Some text.",
+			Parts: []Part{
+				{
+					"text/plain",
+					"UTF-8",
+					[]byte("Some text."),
+					map[string][]string{
+						"Content-Type": {
+							"text/plain",
+						},
+					},
+				},
+			},
+		},
+	},
 }
 
 func TestParse(t *testing.T) {

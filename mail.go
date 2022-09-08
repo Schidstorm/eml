@@ -63,7 +63,7 @@ func Process(r RawMessage) (m Message, e error) {
 	var er error
 
 	// is multipart with base64 encoding valid?
-	if m.FullHeaders.ContentType() == "multipart/alternative" {
+	if m.FullHeaders.MediaType().Type == "multipart/alternative" {
 		parts, er = parseMultipartBody(m.FullHeaders.ContentType(), r.Body)
 		if er != nil {
 			e = er

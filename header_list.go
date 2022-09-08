@@ -2,6 +2,7 @@ package eml
 
 import (
 	"fmt"
+	"mime"
 	"strings"
 	"time"
 
@@ -34,6 +35,19 @@ func (h HeaderList) ContentType() string {
 		return header
 	}
 	return "text/plain"
+}
+
+type MediaType struct {
+	Type   string
+	Params map[string]string
+}
+
+func (h HeaderList) MediaType() MediaType {
+	mediaType, params, _ := mime.ParseMediaType(h.ContentType())
+	return MediaType{
+		Type:   mediaType,
+		Params: params,
+	}
 }
 
 func (h HeaderList) MessageId() string {
