@@ -52,7 +52,11 @@ func Parse(s []byte) (m Message, e error) {
 func Process(r RawMessage) (m Message, e error) {
 	m.FullHeaders = HeaderList{}
 	for _, rh := range r.RawHeaders {
-		m.FullHeaders.Add(string(rh.Key), string(rh.Value))
+		v, err := decoder.Parse(rh.Value)
+		if err != nil {
+			v = rh.Value
+		}
+		m.FullHeaders.Add(string(rh.Key), string(v))
 	}
 
 	var parts []Part
