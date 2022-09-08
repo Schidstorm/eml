@@ -173,6 +173,25 @@ G'day, mate.
 		},
 	},
 	{
+		crlf(`Subject: =?UTF-8?Q?german_=C3=BC_=26_=26_=2E?=
+
+G'day, mate.
+`),
+		Message{
+			HeaderInfo: HeaderInfo{
+				FullHeaders: HeaderList{"Subject": {"german_ü_&_&_."}},
+			},
+			Text: "G'day, mate.\r\n",
+			Parts: []Part{
+				{
+					Type:    "text/plain",
+					Charset: "",
+					Data:    []byte("G'day, mate.\r\n"),
+				},
+			},
+		},
+	},
+	{
 		crlf(`Subject: Hello, world
 Content-Type: text/plain
 Content-Transfer-Encoding: base64
