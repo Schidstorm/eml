@@ -240,22 +240,36 @@ VGhpcyBpcyBhIHRlc3QgaW4gYmFzZTY0
 	},
 
 	{
-		crlf(`Content-Type: multipart/alternative; boundary=90e6ba1efd30b0013a04b8d4970f
+		crlf(`Content-Type: multipart/alternative; boundary="_----------=_MCPart_418513213"
 
---90e6ba1efd30b0013a04b8d4970f
+--_----------=_MCPart_418513213
 Content-Type: text/plain
 
 Some text.
---90e6ba1efd30b0013a04b8d4970f
+--_----------=_MCPart_418513213
+Content-Type: text/plain
+
+Some text.
+--_----------=_MCPart_418513213
 `),
 		Message{
 			HeaderInfo: HeaderInfo{
 				FullHeaders: HeaderList{
-					"Content-Type": {"multipart/alternative; boundary=90e6ba1efd30b0013a04b8d4970f"},
+					"Content-Type": {"multipart/alternative; boundary=\"_----------=_MCPart_418513213\""},
 				},
 			},
 			Text: "Some text.",
 			Parts: []Part{
+				{
+					"text/plain",
+					"UTF-8",
+					[]byte("Some text."),
+					map[string][]string{
+						"Content-Type": {
+							"text/plain",
+						},
+					},
+				},
 				{
 					"text/plain",
 					"UTF-8",

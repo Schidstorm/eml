@@ -14,7 +14,10 @@ type parseBodyTest struct {
 var parseBodyTests = []parseBodyTest{
 	{
 		ct: "multipart/alternative; boundary=90e6ba1efd30b0013a04b8d4970f",
-		body: []byte(`--90e6ba1efd30b0013a04b8d4970f
+		body: []byte(`
+Preamble. to be ignored
+
+--90e6ba1efd30b0013a04b8d4970f
 Content-Type: text/plain; charset=ISO-8859-1
 
 Some text.
