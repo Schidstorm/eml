@@ -67,6 +67,7 @@ func forEncodedParts(input string, cb func(encodingName, encodingType, encodingC
 			} else {
 				result.WriteRune('=')
 				result.WriteRune(c)
+				state = stateNone
 			}
 		case stateName:
 			if c == '?' {
@@ -100,6 +101,10 @@ func forEncodedParts(input string, cb func(encodingName, encodingType, encodingC
 			result.WriteString(part)
 			state = stateNone
 		}
+	}
+
+	if state != stateNone {
+		return result.String(), errors.New("invalid encoding format")
 	}
 
 	return result.String(), nil
