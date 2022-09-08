@@ -6,7 +6,6 @@ package eml
 
 import (
 	"bytes"
-	"crypto/sha1"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -15,40 +14,13 @@ import (
 	"mime/quotedprintable"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/Schidstorm/eml/decoder"
 )
 
-var benc = base64.URLEncoding
-
-func mkId(s []byte) string {
-	h := sha1.New()
-	h.Write(s)
-	hash := h.Sum(nil)
-	ed := benc.EncodeToString(hash)
-	return ed[0:20]
-}
-
 type HeaderInfo struct {
-	FullHeaders []Header // all headers
+	FullHeaders HeaderList // all headers
 
-	MessageId   string
-	Id          string
-	Date        time.Time
-	From        []Address
-	Sender      Address
-	ReplyTo     []Address
-	To          []Address
-	Cc          []Address
-	Bcc         []Address
-	Subject     string
-	Comments    []string
-	Keywords    []string
-	ContentType string
-
-	InReply    []string
-	References []string
 }
 
 type Message struct {
@@ -78,143 +50,76 @@ func Parse(s []byte) (m Message, e error) {
 }
 
 func Process(r RawMessage) (m Message, e error) {
-	m.FullHeaders = []Header{}
+	m.FullHeaders = HeaderList{}
 	for _, rh := range r.RawHeaders {
-		h := Header{string(rh.Key), string(rh.Value)}
-		m.FullHeaders = append(m.FullHeaders, h)
-		switch string(rh.Key) {
-		case `Content-Type`:
-			m.ContentType = string(rh.Value)
-		case `Message-ID`:
-			v := bytes.Trim(rh.Value, `<>`)
-			m.MessageId = string(v)
-			m.Id = mkId(v)
-		case `In-Reply-To`:
-			ids := strings.Fields(string(rh.Value))
-			for _, id := range ids {
-				m.InReply = append(m.InReply, strings.Trim(id, `<> `))
-			}
-		case `References`:
-			ids := strings.Fields(string(rh.Value))
-			for _, id := range ids {
-				m.References = append(m.References, strings.Trim(id, `<> `))
-			}
-		case `Date`:
-			m.Date = ParseDate(string(rh.Value))
-		case `From`:
-			m.From, e = parseAddressList(rh.Value)
-		case `Sender`:
-			m.Sender, e = ParseAddress(rh.Value)
-		case `Reply-To`:
-			m.ReplyTo, e = parseAddressList(rh.Value)
-		case `To`:
-			m.To, e = parseAddressList(rh.Value)
-		case `Cc`:
-			m.Cc, e = parseAddressList(rh.Value)
-		case `Bcc`:
-			m.Bcc, e = parseAddressList(rh.Value)
-		case `Subject`:
-			subject, err := decoder.Parse(rh.Value)
-			if err != nil {
-				fmt.Println("Failed decode subject", err)
-			}
-			m.Subject = string(subject)
-		case `Comments`:
-			m.Comments = append(m.Comments, string(rh.Value))
-		case `Keywords`:
-			ks := strings.Split(string(rh.Value), ",")
-			for _, k := range ks {
-				m.Keywords = append(m.Keywords, strings.TrimSpace(k))
-			}
-		}
-		if e != nil {
-			return
-		}
-	}
-	if m.Sender == nil && len(m.From) > 0 {
-		m.Sender = m.From[0]
+		m.FullHeaders.Add(string(rh.Key), string(rh.Value))
 	}
 
 	var parts []Part
 	var er error
 
-	if m.ContentType == "multipart/alternative" {
-		parts, er = parseMultipartBody(m.ContentType, r.Body)
+	// is multipart with base64 encoding valid?
+	if m.FullHeaders.ContentType() == "multipart/alternative" {
+		parts, er = parseMultipartBody(m.FullHeaders.ContentType(), r.Body)
 		if er != nil {
 			e = er
 			return
 		}
-	} else if m.ContentType != "" {
-		_, ps, err := mime.ParseMediaType(m.ContentType)
+	} else {
+		body := r.Body
+		if hdr, ok := m.HeaderInfo.FullHeaders.FirstByKey("Content-Transfer-Encoding"); ok {
+			body, er = decodeByTransferEncoding(body, hdr)
+			if er != nil {
+				e = er
+				return
+			}
+		}
+
+		_, ps, err := mime.ParseMediaType(m.HeaderInfo.FullHeaders.ContentType())
 		if err != nil {
 			e = err
 			return
 		}
-		parts = append(parts, Part{m.ContentType, ps["charset"], r.Body, nil})
+
+		if charset, ok := ps["charset"]; ok && charset != "" {
+			body = encodeData(body, charset)
+		}
+
+		parts = append(parts, Part{m.FullHeaders.ContentType(), ps["charset"], body, nil})
 	}
 
-	if m.ContentType != `` {
-		if m.ContentType != "multipart/alternative" && len(parts) > 0 {
-			if parts[0].Headers == nil {
-				parts[0].Headers = map[string][]string{}
-			}
-			for _, h := range m.HeaderInfo.FullHeaders {
-				if _, ok := parts[0].Headers[h.Key]; !ok {
-					parts[0].Headers[h.Key] = []string{}
-				}
-				parts[0].Headers[h.Key] = append(parts[0].Headers[h.Key], h.Value)
-			}
+	for _, part := range parts {
+		switch {
+		case strings.Contains(part.Type, "text/plain"):
+			m.Text = string(part.Data)
+		case strings.Contains(part.Type, "text/html"):
+			m.Html = string(part.Data)
 
-		}
-
-		for i := range parts {
-			if hdr, ok := parts[i].Headers["Content-Transfer-Encoding"]; ok {
-				parts[i].Data, er = decodeByTransferEncoding(parts[i].Data, hdr[0])
-				if er != nil {
-					e = er
-					return
-				}
-			}
-
-			parts[i].Data = encodeData(parts[i].Data, parts[i].Charset)
-		}
-
-		for _, part := range parts {
-			switch {
-			case strings.Contains(part.Type, "text/plain"):
-				m.Text = string(part.Data)
-			case strings.Contains(part.Type, "text/html"):
-				m.Html = string(part.Data)
-
-			default:
-				if cd, ok := part.Headers["Content-Disposition"]; ok {
-					if strings.Contains(cd[0], "attachment") {
-						filename := regexp.MustCompile("(?msi)name=\"(.*?)\"").FindStringSubmatch(cd[0]) //.FindString(cd[0])
-						if len(filename) < 2 {
-							fmt.Println("failed get filename from header content-disposition")
-							break
-						}
-
-						dfilename, err := decoder.Parse([]byte(filename[1]))
-						if err != nil {
-							fmt.Println("Failed decode filename of attachment", err)
-						} else {
-							filename[1] = string(dfilename)
-						}
-
-						m.Attachments = append(m.Attachments, Attachment{filename[1], part.Data})
-
+		default:
+			if cd, ok := part.Headers["Content-Disposition"]; ok {
+				if strings.Contains(cd[0], "attachment") {
+					filename := regexp.MustCompile("(?msi)name=\"(.*?)\"").FindStringSubmatch(cd[0]) //.FindString(cd[0])
+					if len(filename) < 2 {
+						fmt.Println("failed get filename from header content-disposition")
+						break
 					}
+
+					dfilename, err := decoder.Parse([]byte(filename[1]))
+					if err != nil {
+						fmt.Println("Failed decode filename of attachment", err)
+					} else {
+						filename[1] = string(dfilename)
+					}
+
+					m.Attachments = append(m.Attachments, Attachment{filename[1], part.Data})
+
 				}
 			}
 		}
-
-		m.Parts = parts
-		m.ContentType = parts[0].Type
-		m.Text = string(parts[0].Data)
-	} else {
-		m.Text = string(r.Body)
 	}
+
+	m.Parts = parts
+	m.Text = string(parts[0].Data)
 	return
 }
 

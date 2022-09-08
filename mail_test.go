@@ -141,9 +141,16 @@ var parseTests = []parseTest{
 `),
 		Message{
 			HeaderInfo: HeaderInfo{
-				FullHeaders: []Header{},
+				FullHeaders: HeaderList{},
 			},
 			Text: "\r\n",
+			Parts: []Part{
+				{
+					Type:    "text/plain",
+					Charset: "",
+					Data:    []uint8{0xd, 0xa},
+				},
+			},
 		},
 	},
 	{
@@ -153,10 +160,16 @@ G'day, mate.
 `),
 		Message{
 			HeaderInfo: HeaderInfo{
-				FullHeaders: []Header{{"Subject", "Hello, world"}},
-				Subject:     "Hello, world",
+				FullHeaders: HeaderList{"Subject": {"Hello, world"}},
 			},
 			Text: "G'day, mate.\r\n",
+			Parts: []Part{
+				{
+					Type:    "text/plain",
+					Charset: "",
+					Data:    []byte("G'day, mate.\r\n"),
+				},
+			},
 		},
 	},
 	{
@@ -169,25 +182,18 @@ VGhpcyBpcyBhIHRlc3QgaW4gYmFzZTY0
 `),
 		Message{
 			HeaderInfo: HeaderInfo{
-				FullHeaders: []Header{
-					{"Subject", "Hello, world"},
-					{"Content-Type", "text/plain"},
-					{"Content-Transfer-Encoding", "base64"},
+				FullHeaders: HeaderList{
+					"Subject":                   {"Hello, world"},
+					"Content-Type":              {"text/plain"},
+					"Content-Transfer-Encoding": {"base64"},
 				},
-				Subject:     "Hello, world",
-				ContentType: "text/plain",
 			},
 			Text: "This is a test in base64This is a test in base64",
 			Parts: []Part{
-				Part{
+				{
 					Type:    "text/plain",
 					Charset: "",
 					Data:    []byte("This is a test in base64This is a test in base64"),
-					Headers: map[string][]string{
-						"Content-Transfer-Encoding": []string{"base64"},
-						"Content-Type":              []string{"text/plain"},
-						"Subject":                   []string{"Hello, world"},
-					},
 				},
 			},
 		},

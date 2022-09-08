@@ -13,13 +13,6 @@ type parseBodyTest struct {
 
 var parseBodyTests = []parseBodyTest{
 	{
-		ct:   "text/plain; charset=UTF-8",
-		body: []byte(`This is some text.`),
-		rps: []Part{
-			{"text/plain; charset=UTF-8", "UTF-8", []byte("This is some text."), nil},
-		},
-	},
-	{
 		ct: "multipart/alternative; boundary=90e6ba1efd30b0013a04b8d4970f",
 		body: []byte(`--90e6ba1efd30b0013a04b8d4970f
 Content-Type: text/plain; charset=ISO-8859-1

@@ -4,6 +4,7 @@ package eml
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"io/ioutil"
 	"mime"
@@ -30,8 +31,7 @@ func parseMultipartBody(ct string, body []byte) (parts []Part, err error) {
 
 	boundary, ok := ps["boundary"]
 	if !ok {
-		parts = append(parts, Part{ct, ps["charset"], body, nil})
-		return
+		return nil, errors.New("encountered part without boundary in multipart body")
 	}
 	r := multipart.NewReader(bytes.NewReader(body), boundary)
 	p, err := r.NextRawPart()
@@ -53,6 +53,16 @@ func parseMultipartBody(ct string, body []byte) (parts []Part, err error) {
 			if len(contenttype) > 1 {
 				charset = contenttype[1]
 			}
+
+			if hdr, ok := p.Header["Content-Transfer-Encoding"]; ok {
+				data, err = decodeByTransferEncoding(data, hdr[0])
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			data = encodeData(data, charset)
+
 			part := Part{p.Header["Content-Type"][0], charset, data, p.Header}
 			parts = append(parts, part)
 		}

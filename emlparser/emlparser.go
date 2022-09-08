@@ -49,7 +49,7 @@ func main() {
 		checkerr(err, "failed save text body")
 	}
 
-	header := []string{m.Date.String(), m.Subject, m.From[0].Email(), m.To[0].Email()}
+	header := []string{m.FullHeaders.Date().String(), m.FullHeaders.Subject(), m.FullHeaders.From()[0].Email(), m.FullHeaders.To()[0].Email()}
 	err = ioutil.WriteFile(path.Join(dir, "header.txt"), []byte(strings.Join(header, "\n")), 0755)
 	checkerr(err, "failed save headers")
 
