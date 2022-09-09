@@ -52,11 +52,15 @@ func Parse(s []byte) (m Message, e error) {
 func Process(r RawMessage) (m Message, e error) {
 	m.FullHeaders = HeaderList{}
 	for _, rh := range r.RawHeaders {
-		v, err := decoder.Parse(rh.Value)
-		if err != nil {
-			v = rh.Value
+		if isUnstructuredHeader(string(rh.Key)) {
+			v, err := decoder.Parse(rh.Value)
+			if err != nil {
+				v = rh.Value
+			}
+			m.FullHeaders.Add(string(rh.Key), string(v))
+		} else {
+			m.FullHeaders.Add(string(rh.Key), string(rh.Value))
 		}
-		m.FullHeaders.Add(string(rh.Key), string(v))
 	}
 
 	var parts []Part
@@ -126,6 +130,15 @@ func Process(r RawMessage) (m Message, e error) {
 	m.Parts = parts
 	m.Text = string(parts[0].Data)
 	return
+}
+
+func isUnstructuredHeader(key string) bool {
+	switch key {
+	case "Subject", "Comments":
+		return true
+	default:
+		return false
+	}
 }
 
 func decodeByTransferEncoding(body []byte, transferEncoding string) ([]byte, error) {
