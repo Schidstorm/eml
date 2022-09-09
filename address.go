@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/Schidstorm/eml/decoder"
 )
 
 type Address interface {
@@ -55,6 +57,40 @@ func (ga GroupAddr) Email() string {
 	return ""
 }
 
+type DecodedAddress struct {
+	name   string
+	email  string
+	string string
+}
+
+func CreateDecodedAddress(addr Address) DecodedAddress {
+
+	return DecodedAddress{
+		name:   tryDecode(addr.Name()),
+		email:  tryDecode(addr.Email()),
+		string: tryDecode(addr.String()),
+	}
+}
+
+func tryDecode(in string) string {
+	if res, err := decoder.Parse([]byte(in)); err == nil {
+		return string(res)
+	}
+	return in
+}
+
+func (da DecodedAddress) Name() string {
+	return da.name
+}
+
+func (da DecodedAddress) String() string {
+	return da.string
+}
+
+func (da DecodedAddress) Email() string {
+	return da.email
+}
+
 func ParseAddress(bs []byte) (Address, error) {
 	toks, err := tokenize(bs)
 	if err != nil {
@@ -92,9 +128,11 @@ func parseAddress(toks []token) (Address, error) {
 			}
 			something = true
 		}
-		return ga, nil
+		return CreateDecodedAddress(ga), nil
 	}
-	return parseMailboxAddr(toks)
+
+	addr, err := parseMailboxAddr(toks)
+	return CreateDecodedAddress(addr), err
 }
 
 func splitOn(ts []token, s token) ([]token, []token, error) {
