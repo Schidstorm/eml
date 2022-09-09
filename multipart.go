@@ -36,6 +36,10 @@ func parseMultipartBody(ct string, body []byte) (parts []Part, err error) {
 	r := multipart.NewReader(bytes.NewReader(body), boundary)
 	p, err := r.NextRawPart()
 	for err != io.EOF {
+		if err != nil {
+			return
+		}
+
 		data, _ := ioutil.ReadAll(p) // ignore error
 
 		var subparts []Part
