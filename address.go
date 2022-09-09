@@ -128,11 +128,11 @@ func parseAddress(toks []token) (Address, error) {
 			}
 			something = true
 		}
-		return CreateDecodedAddress(ga), nil
+		return ga, nil
 	}
 
 	addr, err := parseMailboxAddr(toks)
-	return CreateDecodedAddress(addr), err
+	return addr, err
 }
 
 func splitOn(ts []token, s token) ([]token, []token, error) {
